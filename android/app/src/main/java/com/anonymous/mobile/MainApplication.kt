@@ -16,6 +16,9 @@ import com.facebook.soloader.SoLoader
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
+import com.moko.support.scannergw.MokoSupport
+import com.moko.support.scannergw.MQTTSupport
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -24,7 +27,7 @@ class MainApplication : Application(), ReactApplication {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
-            // packages.add(new MyReactNativePackage());
+            packages.add(new MokoScanPackage()) // 🔹 Adicionando o pacote do escaneamento);
             return packages
           }
 
@@ -48,6 +51,10 @@ class MainApplication : Application(), ReactApplication {
       load()
     }
     ApplicationLifecycleDispatcher.onApplicationCreate(this)
+
+    // MokoSDK initialization
+      MokoSupport.getInstance().init(getApplicationContext());
+      MQTTSupport.getInstance().init(getApplicationContext());
   }
 
   override fun onConfigurationChanged(newConfig: Configuration) {
