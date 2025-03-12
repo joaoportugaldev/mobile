@@ -3,6 +3,7 @@ package com.anonymous.mobile
 import android.app.Application
 import android.content.res.Configuration
 
+import com.elvishew.xlog.XLog
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactNativeHost
@@ -18,6 +19,7 @@ import expo.modules.ReactNativeHostWrapper
 
 import com.moko.support.scannergw.MokoSupport
 import com.moko.support.scannergw.MQTTSupport
+import com.anonymous.mobile.moko.MokoScanPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -27,7 +29,7 @@ class MainApplication : Application(), ReactApplication {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Packages that cannot be autolinked yet can be added manually here, for example:
-            packages.add(new MokoScanPackage()) // 🔹 Adicionando o pacote do escaneamento);
+            packages.add(MokoScanPackage()) // 🔹 Adicionando o pacote do escaneamento);
             return packages
           }
 
@@ -45,6 +47,9 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
+
+    XLog.init()
+
     SoLoader.init(this, OpenSourceMergedSoMapping)
     if (BuildConfig.IS_NEW_ARCHITECTURE_ENABLED) {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
