@@ -3,6 +3,7 @@ import { View, Text, Button, FlatList, PermissionsAndroid, Platform, ActivityInd
 import { BleManager, Device } from "react-native-ble-plx";
 
 const bleManager = new BleManager();
+const TARGET_DEVICE_NAME_START = "MINI-02" 
 
 export default function EscanearBLE() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -43,7 +44,7 @@ export default function EscanearBLE() {
         setIsScanning(false);
         return;
       }
-      if (device && device.name) {
+      if (device && device.name && device.name.startsWith(TARGET_DEVICE_NAME_START)) {
         setDevices((prevDevices) => {
           if (!prevDevices.some((d) => d.id === device.id)) {
             return [...prevDevices, device];
