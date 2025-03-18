@@ -7,24 +7,40 @@ import android.os.Looper;
 import android.os.ParcelUuid;
 import android.util.Log;
 import androidx.annotation.NonNull;
+import android.bluetooth.BluetoothDevice;
+
 import com.facebook.react.bridge.NativeModule;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.Promise;
+
 import com.moko.support.scannergw.MokoBleScanner;
+import com.moko.support.scannergw.OrderTaskAssembler;
 import com.moko.support.scannergw.MokoSupport;
 import com.moko.support.scannergw.callback.MokoScanDeviceCallback;
 import com.moko.support.scannergw.entity.DeviceInfo;
 import com.moko.support.scannergw.entity.OrderServices;
+
+import com.moko.ble.lib.task.OrderTask;
+import com.moko.ble.lib.event.ConnectStatusEvent;
+import com.moko.ble.lib.task.OrderTaskResponse;
+import com.moko.ble.lib.MokoConstants;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
 import no.nordicsemi.android.support.v18.scanner.ScanRecord;
 import no.nordicsemi.android.support.v18.scanner.ScanResult;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 public class MokoScanModule extends ReactContextBaseJavaModule {
 
@@ -86,10 +102,14 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                     ScanRecord scanRecord = scanResult.getScanRecord();
                     Map<ParcelUuid, byte[]> serviceData = scanRecord.getServiceData();
 
-                    if (serviceData == null || serviceData.isEmpty()) return;
+                    if (serviceData == null || serviceData.isEmpty()) {
+                        return;
+                    }
 
                     byte[] data = serviceData.get(new ParcelUuid(OrderServices.SERVICE_ADV.getUuid()));
-                    if (data == null || data.length != 1) return;
+                    if (data == null || data.length != 1) {
+                        return;
+                    }
 
                     deviceInfo.deviceType = data[0] & 0xFF;
                     deviceMap.put(deviceInfo.mac, deviceInfo);
@@ -157,4 +177,69 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
             promise.reject("STOP_SCAN_ERROR", "Erro ao interromper escaneamento", e);
         }
     }
+
+    @ReactMethod
+    public void connectToDevice(String macAddress, Promise promise) {
+    try {
+        if (!deviceMap.containsKey(macAddress)) {
+            promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado no mapa de dispositivos.");
+            return;
+        }
+
+        EventBus.getDefault().register(this);
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            promise.reject("BLUETOOTH_DISABLED", "O Bluetooth está desligado ou não disponível.");
+            return;
+        }
+
+        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
+        if (device == null) {
+            promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado.");
+            return;
+        }
+
+        MokoSupport.getInstance().getMokoBleManager().connect(device)
+        .done(gatt -> {
+                Log.d(TAG, "✅ Conexão bem-sucedida com " + macAddress);
+
+                // Enviar senha automaticamente para autenticação
+                List<OrderTask> orderTasks = new ArrayList<>();
+                orderTasks.add(OrderTaskAssembler.setPassword("Moko4321"));
+
+                MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
+
+                promise.resolve("Conexão bem-sucedida!");
+            })
+            .fail((device1, status) -> {
+                Log.e(TAG, "❌ Falha na conexão: " + status);
+                promise.reject("CONNECTION_FAILED", "Falha ao conectar ao dispositivo.");
+            })
+            .enqueue();
+
+        promise.resolve("Conectando ao dispositivo..." + macAddress);
+
+    } catch (Exception e) {
+        Log.e(TAG, "❌ Erro ao conectar ao dispositivo", e);
+        promise.reject("CONNECTION_ERROR", e.getMessage());
+    }
+}
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onConnectStatusEvent(ConnectStatusEvent event) {
+        switch (event.getAction()) {
+            case MokoConstants.ACTION_DISCOVER_SUCCESS:
+                Log.d(TAG, "🔗 Dispositivo conectado com sucesso!");
+                break;
+            case MokoConstants.ACTION_DISCONNECTED:
+                Log.d(TAG, "🔗 Dispositivo desconectado!");
+                break;
+        }
+    }
+
+// Não se esqueça de desregistrar o EventBus quando não for mais necessário
+    public void onDestroy() {
+        EventBus.getDefault().unregister(this);
+    }
+
 }

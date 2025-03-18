@@ -153,6 +153,7 @@ dependencies {
     // Moko SDK
     implementation fileTree(include: '*.jar', dir: 'libs')
     implementation project(path: ':mokosupport')
+    implementation 'no.nordicsemi.android:ble:2.7.2'
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
