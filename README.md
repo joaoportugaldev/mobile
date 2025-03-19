@@ -11,6 +11,19 @@ Também foi instalado a extensão no VSCode JVM Bytecode Viewer do MaxL para vis
 
 // ==================================
 
+Comandos importantes no desenvolvimento
+
+#### Limpar o console logcat
+```bash
+adb logcat -c
+```
+
+#### Rodar logcat com filtro para execuções em MokoScanModule
+```bash
+adb logcat | grep "MokoScanModule" 
+```
+
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

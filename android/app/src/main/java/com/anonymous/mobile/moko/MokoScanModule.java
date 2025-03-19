@@ -188,65 +188,18 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                 return;
             }
 
-            // EventBus.getDefault().register(this);
+            // Registra o EventBus para receber eventos de conexão se ainda não estiver
+            // registrado
+            if (!EventBus.getDefault().isRegistered(this)) {
+                EventBus.getDefault().register(this);
+            }
 
-            // 🔹 Verifica se o Bluetooth está ativado antes de conectar
-            // BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-            // if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-            // promise.reject("BLUETOOTH_DISABLED", "O Bluetooth está desligado ou não
-            // disponível.");
-            // return;
-            // }
-
-            // Obtém uma instância do Gateway com Mac especificado
-            // BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
-            // if (device == null) {
-            // promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado.");
-            // return;
-            // }
-
-            // Inicia a conexão com o Gateway
+            // Inicia a conexão do celular com o dispositivo (Gateway - Gerenciador de
+            // Sensores)
             MokoSupport moko = MokoSupport.getInstance();
             moko.connDevice(macAddress);
             promise.resolve("Conexão com dispositivo de mac " + macAddress + " iniciada.");
 
-            // MokoSupport.getInstance().getMokoBleManager().connect(device)
-            // .done(gatt -> {
-            // Log.d(TAG, "✅ Conexão estabelecida com Gateway de Mac: " + macAddress);
-
-            // Enviar senha automaticamente para autenticação
-            // Log.d(TAG, "✅ Enviando senha para autenticação do Gateway: " + macAddress);
-            // OrderTask passwordTask = OrderTaskAssembler.setPassword("Moko4321");
-            // Log.d(TAG, "🔐 Ordem de tarefa gerada: " + passwordTask.toString());
-
-            // Uma vez que a task é criada é preciso enviar para o Gateway ???
-
-            // Log.d(TAG, "✅ Enviando ordens para Gateway: " + macAddress);
-            // MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
-            // Log.d(TAG, "✅ Ordens enviadas com sucesso para Gateway: " + macAddress);
-
-            // Cria um JSONObject com as informações do dispositivo
-            // JSONObject jsonDevice = new JSONObject();
-            // try {
-            // jsonDevice.put("name", device.getName());
-            // jsonDevice.put("address", device.getAddress());
-            // jsonDevice.put("type", device.getType());
-            // jsonDevice.put("bondState", device.getBondState());
-            // } catch (Exception e) {
-            // Log.e(TAG, "Erro ao criar JSONObject para o dispositivo", e);
-            // promise.reject("JSON_ERROR", "Erro ao criar JSONObject para o dispositivo");
-            // return;
-            // }
-
-            // Log.d("JSON device", jsonDevice.toString());
-
-            // promise.resolve(jsonDevice);
-            // })
-            // .fail((device1, status) -> {
-            // Log.e(TAG, "❌ Falha na conexão: " + status);
-            // promise.reject("CONNECTION_FAILED", "Falha ao conectar ao dispositivo.");
-            // })
-            // .enqueue();
         } catch (Exception e) {
             Log.e(TAG, "❌ Erro ao conectar ao dispositivo", e);
             promise.reject("CONNECTION_ERROR", e.getMessage());
@@ -279,10 +232,10 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     public void onConnectStatusEvent(ConnectStatusEvent event) {
         switch (event.getAction()) {
             case MokoConstants.ACTION_DISCOVER_SUCCESS:
-                Log.d(TAG, "🔗 Dispositivo conectado com sucesso!");
+                Log.d(TAG, "🔗 EVENT_BUS: Dispositivo conectado com sucesso!");
                 break;
             case MokoConstants.ACTION_DISCONNECTED:
-                Log.d(TAG, "🔗 Dispositivo desconectado!");
+                Log.d(TAG, "🔗 EVENT_BUS: Dispositivo desconectado!");
                 break;
         }
     }
