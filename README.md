@@ -1,3 +1,16 @@
+// ==================================
+Para extrair os arquivos da biblioteca .jar utilizei o comando abaixo:
+
+```bash
+jar xf /caminho/para/mokoBleLib.jar
+```
+
+Em posse desses arquivos fica mais fácil implementar MokoSupport
+
+Também foi instalado a extensão no VSCode JVM Bytecode Viewer do MaxL para visualizar melhor os arquivos .class
+
+// ==================================
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

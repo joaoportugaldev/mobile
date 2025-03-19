@@ -123,7 +123,8 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                     devices.clear();
                     devices.addAll(deviceMap.values());
 
-                    // 🔹 Converte os dispositivos encontrados para JSON e retorna para o React Native
+                    // 🔹 Converte os dispositivos encontrados para JSON e retorna para o React
+                    // Native
                     JSONArray deviceArray = new JSONArray();
                     for (DeviceInfo device : devices) {
                         try {
@@ -148,7 +149,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
             scanHandler.postDelayed(() -> {
                 mokoBleScanner.stopScanDevice();
                 Log.d(TAG, "⏳ Escaneamento finalizado automaticamente após timeout.");
-            }, 10000);
+            }, 1000);
 
         } catch (Exception e) {
             if (scanPromise != null) {
@@ -180,50 +181,99 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void connectToDevice(String macAddress, Promise promise) {
-    try {
-        if (!deviceMap.containsKey(macAddress)) {
-            promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado no mapa de dispositivos.");
-            return;
+        try {
+            // Verifica se o dispositivo está no mapa de dispositivos
+            if (!deviceMap.containsKey(macAddress)) {
+                promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado no mapa de dispositivos.");
+                return;
+            }
+
+            // EventBus.getDefault().register(this);
+
+            // 🔹 Verifica se o Bluetooth está ativado antes de conectar
+            // BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+            // if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
+            // promise.reject("BLUETOOTH_DISABLED", "O Bluetooth está desligado ou não
+            // disponível.");
+            // return;
+            // }
+
+            // Obtém uma instância do Gateway com Mac especificado
+            // BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
+            // if (device == null) {
+            // promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado.");
+            // return;
+            // }
+
+            // Inicia a conexão com o Gateway
+            MokoSupport moko = MokoSupport.getInstance();
+            moko.connDevice(macAddress);
+            promise.resolve("Conexão com dispositivo de mac " + macAddress + " iniciada.");
+
+            // MokoSupport.getInstance().getMokoBleManager().connect(device)
+            // .done(gatt -> {
+            // Log.d(TAG, "✅ Conexão estabelecida com Gateway de Mac: " + macAddress);
+
+            // Enviar senha automaticamente para autenticação
+            // Log.d(TAG, "✅ Enviando senha para autenticação do Gateway: " + macAddress);
+            // OrderTask passwordTask = OrderTaskAssembler.setPassword("Moko4321");
+            // Log.d(TAG, "🔐 Ordem de tarefa gerada: " + passwordTask.toString());
+
+            // Uma vez que a task é criada é preciso enviar para o Gateway ???
+
+            // Log.d(TAG, "✅ Enviando ordens para Gateway: " + macAddress);
+            // MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
+            // Log.d(TAG, "✅ Ordens enviadas com sucesso para Gateway: " + macAddress);
+
+            // Cria um JSONObject com as informações do dispositivo
+            // JSONObject jsonDevice = new JSONObject();
+            // try {
+            // jsonDevice.put("name", device.getName());
+            // jsonDevice.put("address", device.getAddress());
+            // jsonDevice.put("type", device.getType());
+            // jsonDevice.put("bondState", device.getBondState());
+            // } catch (Exception e) {
+            // Log.e(TAG, "Erro ao criar JSONObject para o dispositivo", e);
+            // promise.reject("JSON_ERROR", "Erro ao criar JSONObject para o dispositivo");
+            // return;
+            // }
+
+            // Log.d("JSON device", jsonDevice.toString());
+
+            // promise.resolve(jsonDevice);
+            // })
+            // .fail((device1, status) -> {
+            // Log.e(TAG, "❌ Falha na conexão: " + status);
+            // promise.reject("CONNECTION_FAILED", "Falha ao conectar ao dispositivo.");
+            // })
+            // .enqueue();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao conectar ao dispositivo", e);
+            promise.reject("CONNECTION_ERROR", e.getMessage());
         }
-
-        EventBus.getDefault().register(this);
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
-            promise.reject("BLUETOOTH_DISABLED", "O Bluetooth está desligado ou não disponível.");
-            return;
-        }
-
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress);
-        if (device == null) {
-            promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado.");
-            return;
-        }
-
-        MokoSupport.getInstance().getMokoBleManager().connect(device)
-        .done(gatt -> {
-                Log.d(TAG, "✅ Conexão bem-sucedida com " + macAddress);
-
-                // Enviar senha automaticamente para autenticação
-                List<OrderTask> orderTasks = new ArrayList<>();
-                orderTasks.add(OrderTaskAssembler.setPassword("Moko4321"));
-
-                MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
-
-                promise.resolve("Conexão bem-sucedida!");
-            })
-            .fail((device1, status) -> {
-                Log.e(TAG, "❌ Falha na conexão: " + status);
-                promise.reject("CONNECTION_FAILED", "Falha ao conectar ao dispositivo.");
-            })
-            .enqueue();
-
-        promise.resolve("Conectando ao dispositivo..." + macAddress);
-
-    } catch (Exception e) {
-        Log.e(TAG, "❌ Erro ao conectar ao dispositivo", e);
-        promise.reject("CONNECTION_ERROR", e.getMessage());
     }
-}
+
+    @ReactMethod
+    public boolean isDeviceConnected(String macAddress) {
+        try {
+            MokoSupport moko = MokoSupport.getInstance();
+            return moko.isConnDevice(macAddress);
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Erro ao verificar conexão com dispositivo", e);
+            return false;
+        }
+    }
+
+    @ReactMethod
+    public void disconnectDevice(Promise promise) {
+        try {
+            MokoSupport moko = MokoSupport.getInstance();
+            moko.disConnectBle();
+            promise.resolve("Dispositivo desconectado com sucesso!");
+        } catch (Exception e) {
+            promise.reject("DISCONNECTION_ERROR", e);
+        }
+    }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onConnectStatusEvent(ConnectStatusEvent event) {
@@ -237,7 +287,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
         }
     }
 
-// Não se esqueça de desregistrar o EventBus quando não for mais necessário
+    // Não se esqueça de desregistrar o EventBus quando não for mais necessário
     public void onDestroy() {
         EventBus.getDefault().unregister(this);
     }
