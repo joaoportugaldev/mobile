@@ -1,5 +1,5 @@
-import { Alert, NativeModules } from "react-native";
-import { useState } from "react";
+import { Alert, NativeEventEmitter, NativeModules } from "react-native";
+import { useEffect, useState } from "react";
 import { requestPermissionsAndroid } from "@/utils/functions/requestPermissions";
 
 interface GerenciadorProps {
@@ -8,6 +8,7 @@ interface GerenciadorProps {
 }
 
 const { MokoScanModule } = NativeModules;
+const mokoScanEmitter = new NativeEventEmitter();
 
 export default function useGerenciadores() {
   const [gerenciadores, setDevices] = useState<GerenciadorProps[]>([]);
@@ -32,7 +33,6 @@ export default function useGerenciadores() {
       );
     } finally {
       setIsEscaneando(false);
-      console.log(isConectando);
     }
   };
 
@@ -74,6 +74,31 @@ export default function useGerenciadores() {
       console.error(error);
     }
   };
+
+  useEffect(() => {
+    mokoScanEmitter.emit(MokoScanModule);
+    
+    const connectStatusSubscription = mokoScanEmitter.addListener(
+      "onConnectStatusEvent",
+      (event) => {
+        console.log("Connection status event received:", event);
+        // Handle the connection status event
+      }
+    );
+
+    const orderTaskResponseSubscription = mokoScanEmitter.addListener(
+      "onOrderTaskResponseEvent",
+      (event) => {
+        console.log("Order task response event received:", event);
+        // Handle the order task response event
+      }
+    );
+
+    return () => {
+      connectStatusSubscription.remove();
+      orderTaskResponseSubscription.remove();
+    };
+  }, []);
 
   return {
     gerenciadores,

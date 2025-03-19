@@ -24,6 +24,7 @@ import com.moko.support.scannergw.entity.OrderServices;
 
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.event.ConnectStatusEvent;
+import com.moko.ble.lib.event.OrderTaskResponseEvent;
 import com.moko.ble.lib.task.OrderTaskResponse;
 import com.moko.ble.lib.MokoConstants;
 
@@ -41,6 +42,12 @@ import no.nordicsemi.android.support.v18.scanner.ScanResult;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
+
+import com.facebook.react.bridge.Arguments;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.facebook.react.bridge.ReactContext;
+import javax.annotation.Nullable;
 
 public class MokoScanModule extends ReactContextBaseJavaModule {
 
@@ -230,19 +237,38 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onConnectStatusEvent(ConnectStatusEvent event) {
+        WritableMap params = Arguments.createMap();
         switch (event.getAction()) {
             case MokoConstants.ACTION_DISCOVER_SUCCESS:
                 Log.d(TAG, "🔗 EVENT_BUS: Dispositivo conectado com sucesso!");
+                params.putString("status", "connected");
                 break;
             case MokoConstants.ACTION_DISCONNECTED:
                 Log.d(TAG, "🔗 EVENT_BUS: Dispositivo desconectado!");
+                params.putString("status", "disconnected");
                 break;
         }
+        sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
+        WritableMap params = Arguments.createMap();
+        params.putString("action", event.getAction());
+        params.putString("response", event.getResponse().toString());
+        sendEvent(getReactApplicationContext(), "onOrderTaskResponseEvent", params);
     }
 
     // Não se esqueça de desregistrar o EventBus quando não for mais necessário
     public void onDestroy() {
         EventBus.getDefault().unregister(this);
+    }
+
+    // Método para enviar eventos para o javascript
+    private void sendEvent(ReactContext reactContext, String eventName, @Nullable WritableMap params) {
+        reactContext
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                .emit(eventName, params);
     }
 
 }
