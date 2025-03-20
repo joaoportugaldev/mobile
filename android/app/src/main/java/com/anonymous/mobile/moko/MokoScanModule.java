@@ -21,6 +21,7 @@ import com.moko.support.scannergw.MokoSupport;
 import com.moko.support.scannergw.callback.MokoScanDeviceCallback;
 import com.moko.support.scannergw.entity.DeviceInfo;
 import com.moko.support.scannergw.entity.OrderServices;
+import com.moko.support.scannergw.entity.OrderCHAR;
 
 import com.moko.ble.lib.task.OrderTask;
 import com.moko.ble.lib.event.ConnectStatusEvent;
@@ -34,6 +35,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import no.nordicsemi.android.support.v18.scanner.ScanRecord;
@@ -56,6 +58,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     private ConcurrentHashMap<String, DeviceInfo> deviceMap;
     private List<DeviceInfo> devices;
     private Handler scanHandler;
+    private boolean isPasswordError;
     private boolean isScanning = false;
     private Promise scanPromise;
 
@@ -65,6 +68,12 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
         deviceMap = new ConcurrentHashMap<>();
         devices = new ArrayList<>();
         scanHandler = new Handler(Looper.getMainLooper());
+
+        // Registra o EventBus para receber eventos de conexão se ainda não estiver
+        // registrado
+        if (!EventBus.getDefault().isRegistered(this)) {
+            EventBus.getDefault().register(this);
+        }
     }
 
     @NonNull
@@ -195,12 +204,6 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                 return;
             }
 
-            // Registra o EventBus para receber eventos de conexão se ainda não estiver
-            // registrado
-            if (!EventBus.getDefault().isRegistered(this)) {
-                EventBus.getDefault().register(this);
-            }
-
             // Inicia a conexão do celular com o dispositivo (Gateway - Gerenciador de
             // Sensores)
             MokoSupport moko = MokoSupport.getInstance();
@@ -237,27 +240,90 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onConnectStatusEvent(ConnectStatusEvent event) {
+        String action = event.getAction();
         WritableMap params = Arguments.createMap();
-        switch (event.getAction()) {
-            case MokoConstants.ACTION_DISCOVER_SUCCESS:
-                Log.d(TAG, "🔗 EVENT_BUS: Dispositivo conectado com sucesso!");
-                params.putString("status", "connected");
-                break;
-            case MokoConstants.ACTION_DISCONNECTED:
-                Log.d(TAG, "🔗 EVENT_BUS: Dispositivo desconectado!");
-                params.putString("status", "disconnected");
-                break;
+
+        if (MokoConstants.ACTION_DISCONNECTED.equals(action)) {
+            Log.d(TAG, "🔗 EVENT_BUS: Dispositivo desconectado!");
+            params.putString("status", "disconnected");
+            sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
+
+            if (isPasswordError) {
+                isPasswordError = false;
+            } else {
+                Log.e(TAG, "❌ Conexão falhou, tentando novamente...");
+            }
         }
-        sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
+
+        if (MokoConstants.ACTION_DISCOVER_SUCCESS.equals(action)) {
+            Log.d(TAG, "🔗 EVENT_BUS: Dispositivo descoberto com sucesso! Verificando senha...");
+            params.putString("status", "connected");
+            sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
+
+            new Handler().postDelayed(() -> {
+                List<OrderTask> orderTasks = new ArrayList<>();
+                orderTasks.add(OrderTaskAssembler.setPassword("Moko4321"));
+                MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
+                Log.d(TAG, "🔐 Senha enviada automaticamente para autenticação.");
+            }, 500);
+        }
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
+        final String action = event.getAction();
         WritableMap params = Arguments.createMap();
-        params.putString("action", event.getAction());
-        params.putString("response", event.getResponse().toString());
-        sendEvent(getReactApplicationContext(), "onOrderTaskResponseEvent", params);
+
+        if (MokoConstants.ACTION_ORDER_TIMEOUT.equals(action)) {
+            Log.e(TAG, "⏳ Tempo limite atingido para resposta.");
+            MokoSupport.getInstance().disConnectBle();
+            return;
+        }
+
+        if (MokoConstants.ACTION_ORDER_RESULT.equals(action)) {
+            OrderTaskResponse response = event.getResponse();
+            if (response == null || response.responseValue == null || response.responseValue.length < 5) {
+                Log.e(TAG, "❌ Resposta inválida do dispositivo.");
+                return;
+            }
+
+            byte[] value = response.responseValue;
+            int header = value[0] & 0xFF; // 0xED
+            int flag = value[1] & 0xFF; // read or write
+            int cmd = value[2] & 0xFF;
+            int length = value[3] & 0xFF;
+
+            if (header != 0xED)
+                return;
+
+            if (flag == 0x01 && cmd == 0x01 && length == 0x01) {
+                int result = value[4] & 0xFF;
+
+                if (result == 1) {
+                    Log.d(TAG, "✅ Senha aceita pelo dispositivo!");
+                    params.putString("status", "authenticated");
+                    sendEvent(getReactApplicationContext(), "onOrderTaskResponseEvent", params);
+
+                    // Enviar usuário para a tela de informações do dispositivo
+                    // WritableMap deviceParams = Arguments.createMap();
+                    // deviceParams.putString("mac", selectedMac);
+                    // deviceParams.putString("name", selectedName);
+                    // sendEvent(getReactApplicationContext(), "navigateToDeviceInfo",
+                    // deviceParams);
+
+                } else {
+                    Log.e(TAG, "❌ Senha incorreta!");
+                    MokoSupport.getInstance().disConnectBle();
+                }
+            }
+        }
     }
+
+    // @ReactMethod
+    // public void setGatewayPassword() {
+    // String password = "senhaerrada";
+    // MokoSupport.getInstance().sendOrder(OrderTaskAssembler.setPassword(password));
+    // }
 
     // Não se esqueça de desregistrar o EventBus quando não for mais necessário
     public void onDestroy() {

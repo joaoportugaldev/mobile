@@ -75,9 +75,18 @@ export default function useGerenciadores() {
     }
   };
 
+  const inserirSenha = async () => {
+    try {
+      const message = await MokoScanModule.setGatewayPassword();
+      Alert.alert("Senha inserida", message);
+    } catch (error: any) {
+      console.error(error);
+    }
+  };
+
   useEffect(() => {
     mokoScanEmitter.emit(MokoScanModule);
-    
+
     const connectStatusSubscription = mokoScanEmitter.addListener(
       "onConnectStatusEvent",
       (event) => {
@@ -108,5 +117,6 @@ export default function useGerenciadores() {
     conectarGerenciador,
     obterStatusConexao,
     desconectarGerenciador,
+    inserirSenha
   };
 }

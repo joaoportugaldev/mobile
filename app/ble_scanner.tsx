@@ -12,7 +12,8 @@ export default function EscanearBLE() {
     gerenciadores,
     obterStatusConexao,
     escanearGerenciadores,
-    desconectarGerenciador
+    desconectarGerenciador,
+    inserirSenha,
   } = useGerenciadores();
 
   return (
@@ -55,10 +56,8 @@ export default function EscanearBLE() {
           title="Verificar conexão"
           onPress={() => obterStatusConexao()}
         />
-        <Button
-          title="Desconectar"
-          onPress={() => desconectarGerenciador()}
-        />
+        <Button title="Desconectar" onPress={() => desconectarGerenciador()} />
+        <Button title="Inserir senha" onPress={() => inserirSenha()} />
       </View>
     </View>
   );
