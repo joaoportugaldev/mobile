@@ -57,6 +57,8 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     private MokoBleScanner _mokoBleScanner;
     private ConcurrentHashMap<String, DeviceInfo> _deviceMap;
     private List<DeviceInfo> _devices;
+    private String _authenticatedDeviceName;
+    private String _authenticatedDeviceMac;
     private Handler _scanHandler;
     private String _defaultPassword = "Moko4321";
     private boolean _isPasswordError;
@@ -211,6 +213,11 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
             // Inicia a conexão do celular com o dispositivo (Gateway - Gerenciador de
             // Sensores)
             MokoSupport.getInstance().connDevice(macAddress);
+
+            DeviceInfo selectedDevice = _deviceMap.get(macAddress);
+            _authenticatedDeviceMac = selectedDevice.mac;
+            _authenticatedDeviceName = selectedDevice.name;
+
             Log.d(TAG, "Conexão com dispositivo de mac " + macAddress + " iniciada.");
             promise.resolve("Conexão com dispositivo de mac " + macAddress + " iniciada.");
 
@@ -313,14 +320,9 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                     Log.d(TAG, "✅ Dispositivo autenticado!");
                     params.putBoolean("isDeviceConnected", true);
                     params.putBoolean("isDeviceAuthenticated", true);
-                    sendEvent(getReactApplicationContext(), "onOrderTaskResponseEvent", params);
-
-                    // Enviar usuário para a tela de informações do dispositivo
-                    // WritableMap deviceParams = Arguments.createMap();
-                    // deviceParams.putString("mac", selectedMac);
-                    // deviceParams.putString("name", selectedName);
-                    // sendEvent(getReactApplicationContext(), "navigateToDeviceInfo",
-                    // deviceParams);
+                    params.putString("authenticatedDeviceMac", _authenticatedDeviceMac);
+                    params.putString("authenticatedDeviceName", _authenticatedDeviceName);
+                    sendEvent(getReactApplicationContext(), "onDeviceAuth", params);
 
                 } else {
                     Log.e(TAG, "❌ Senha incorreta!");

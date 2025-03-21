@@ -1,19 +1,16 @@
 import React from "react";
 import { View, Text, Button, FlatList, ActivityIndicator } from "react-native";
-import { useRouter } from "expo-router";
 import useGerenciadores from "@/hooks/useGerenciadores";
 
 export default function EscanearBLE() {
-  const router = useRouter();
   const {
     isConectando,
     isEscaneando,
-    conectarGerenciador,
+    iniciarConexaoGerenciador,
     gerenciadores,
     obterStatusConexao,
     escanearGerenciadores,
     desconectarGerenciador,
-    inserirSenha,
   } = useGerenciadores();
 
   return (
@@ -39,7 +36,7 @@ export default function EscanearBLE() {
             <Text style={{ fontSize: 12, color: "gray" }}>{item.mac}</Text>
             <Button
               title="Conectar"
-              onPress={() => conectarGerenciador(item.mac)}
+              onPress={() => iniciarConexaoGerenciador(item.mac)}
               disabled={isConectando}
             />
           </View>
@@ -57,7 +54,6 @@ export default function EscanearBLE() {
           onPress={() => obterStatusConexao()}
         />
         <Button title="Desconectar" onPress={() => desconectarGerenciador()} />
-        <Button title="Inserir senha" onPress={() => inserirSenha()} />
       </View>
     </View>
   );
