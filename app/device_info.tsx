@@ -10,7 +10,7 @@ export default function DeviceInfo() {
 
   // Detecta quando o usuário clica na seta de voltar
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       const unsubscribe = navigation.addListener("beforeRemove", async (e) => {
         await desconectarGerenciador(); // desconecta ao voltar
       });

@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { createContext, useEffect, useState } from "react";
 import { Alert, NativeEventEmitter, NativeModules } from "react-native";
 
-interface GerenciadorProps {
+export interface GerenciadorProps {
   name: string;
   mac: string;
 }
@@ -25,7 +25,7 @@ export function ProvedorGerenciador(props: any) {
   const { MokoScanModule } = NativeModules;
   const mokoScanEmitter = new NativeEventEmitter();
 
-  const [gerenciadores, setDevices] = useState<GerenciadorProps[]>([]);
+  const [gerenciadores, setGerenciadores] = useState<GerenciadorProps[]>([]);
   const [gerenciadorAutenticado, setGerenciadorAutenticado] =
     useState<GerenciadorProps | null>(null);
   const [isConectando, setIsConectando] = useState(false);
@@ -36,11 +36,11 @@ export function ProvedorGerenciador(props: any) {
     if (!hasPermission) return;
 
     setIsEscaneando(true);
-    setDevices([]); // Limpa a lista antes de escanear novamente
+    setGerenciadores([]); // Limpa a lista antes de escanear novamente
 
     try {
       const result = await MokoScanModule.startScanDevices();
-      setDevices(JSON.parse(result));
+      setGerenciadores(JSON.parse(result));
     } catch (error: any) {
       console.error(error);
       Alert.alert(

@@ -64,7 +64,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     private boolean _isPasswordError;
     private boolean _isScanning = false;
     private Promise _scanPromise;
-    private int _scanTimeout = 1000;
+    private int _scanTimeout = 10000;
 
     public MokoScanModule(ReactApplicationContext reactContext) {
         super(reactContext);

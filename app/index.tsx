@@ -10,6 +10,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
+      <Text>Sagil</Text>
       <Link
         href={"/ble_scanner"}
         style={{
