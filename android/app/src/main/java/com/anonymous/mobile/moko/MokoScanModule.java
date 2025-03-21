@@ -54,26 +54,29 @@ import javax.annotation.Nullable;
 public class MokoScanModule extends ReactContextBaseJavaModule {
 
     private static final String TAG = "MokoScanModule";
-    private MokoBleScanner mokoBleScanner;
-    private ConcurrentHashMap<String, DeviceInfo> deviceMap;
-    private List<DeviceInfo> devices;
-    private Handler scanHandler;
-    private boolean isPasswordError;
-    private boolean isScanning = false;
-    private Promise scanPromise;
+    private MokoBleScanner _mokoBleScanner;
+    private ConcurrentHashMap<String, DeviceInfo> _deviceMap;
+    private List<DeviceInfo> _devices;
+    private Handler _scanHandler;
+    private String _defaultPassword = "Moko4321";
+    private boolean _isPasswordError;
+    private boolean _isScanning = false;
+    private Promise _scanPromise;
+    private int _scanTimeout = 1000;
 
     public MokoScanModule(ReactApplicationContext reactContext) {
         super(reactContext);
-        mokoBleScanner = new MokoBleScanner(reactContext);
-        deviceMap = new ConcurrentHashMap<>();
-        devices = new ArrayList<>();
-        scanHandler = new Handler(Looper.getMainLooper());
+        _mokoBleScanner = new MokoBleScanner(reactContext);
+        _deviceMap = new ConcurrentHashMap<>();
+        _devices = new ArrayList<>();
+        _scanHandler = new Handler(Looper.getMainLooper());
 
-        // Registra o EventBus para receber eventos de conexão se ainda não estiver
-        // registrado
+        // ============================================================
+        // Registra o EventBus para receber eventos de conexão caso não registrado
         if (!EventBus.getDefault().isRegistered(this)) {
             EventBus.getDefault().register(this);
         }
+        // ============================================================
     }
 
     @NonNull
@@ -82,132 +85,133 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
         return "MokoScanModule";
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Escaneamento de dispositivos (gerenciadores)
+    ///////////////////////////////////////////////////////////////////////////
+
     @ReactMethod
     public void startScanDevices(Promise promise) {
         try {
+            // ============================================================
             // 🔹 Verifica se o Bluetooth está ativado antes de escanear
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
             if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled()) {
                 promise.reject("BLUETOOTH_DISABLED", "O Bluetooth está desligado ou não disponível.");
                 return;
             }
+            // ============================================================
 
-            // 🔹 Se um escaneamento já estiver rodando, pare-o antes de iniciar outro
-            if (isScanning) {
-                mokoBleScanner.stopScanDevice();
-                scanHandler.removeCallbacksAndMessages(null);
+            // ============================================================
+            // 🔹 Se um escaneamento já estiver rodando, pare antes de iniciar outro
+            if (_isScanning) {
+                _mokoBleScanner.stopScanDevice();
+                _scanHandler.removeCallbacksAndMessages(null);
             }
+            // ============================================================
 
+            // ============================================================
             // 🔹 Inicializa variáveis
-            isScanning = true;
-            scanPromise = promise;
-            deviceMap.clear();
-            devices.clear();
+            _scanPromise = promise;
+            _deviceMap.clear();
+            _devices.clear();
 
-            Log.d(TAG, "🔍 Iniciando escaneamento de dispositivos...");
+            // ============================================================
+            // 🔹 Inicializa o escaneamento
+            _mokoBleScanner.startScanDevice(this.mokoScanDeviceCallback());
+            // ============================================================
 
-            mokoBleScanner.startScanDevice(new MokoScanDeviceCallback() {
-                @Override
-                public void onStartScan() {
-                    Log.d(TAG, "📡 Escaneamento iniciado...");
-                }
-
-                @Override
-                public void onScanDevice(DeviceInfo deviceInfo) {
-                    ScanResult scanResult = deviceInfo.scanResult;
-                    ScanRecord scanRecord = scanResult.getScanRecord();
-                    Map<ParcelUuid, byte[]> serviceData = scanRecord.getServiceData();
-
-                    if (serviceData == null || serviceData.isEmpty()) {
-                        return;
-                    }
-
-                    byte[] data = serviceData.get(new ParcelUuid(OrderServices.SERVICE_ADV.getUuid()));
-                    if (data == null || data.length != 1) {
-                        return;
-                    }
-
-                    deviceInfo.deviceType = data[0] & 0xFF;
-                    deviceMap.put(deviceInfo.mac, deviceInfo);
-                    Log.d(TAG, "📡 Dispositivo encontrado: " + deviceInfo.name + " - " + deviceInfo.mac);
-                }
-
-                @Override
-                public void onStopScan() {
-                    Log.d(TAG, "🛑 Escaneamento finalizado.");
-                    isScanning = false;
-                    devices.clear();
-                    devices.addAll(deviceMap.values());
-
-                    // 🔹 Converte os dispositivos encontrados para JSON e retorna para o React
-                    // Native
-                    JSONArray deviceArray = new JSONArray();
-                    for (DeviceInfo device : devices) {
-                        try {
-                            JSONObject jsonDevice = new JSONObject();
-                            jsonDevice.put("name", device.name);
-                            jsonDevice.put("mac", device.mac);
-                            jsonDevice.put("rssi", device.rssi);
-                            deviceArray.put(jsonDevice);
-                        } catch (Exception e) {
-                            Log.e(TAG, "Erro ao converter dispositivo para JSON", e);
-                        }
-                    }
-
-                    if (scanPromise != null) {
-                        scanPromise.resolve(deviceArray.toString());
-                        scanPromise = null;
-                    }
-                }
-            });
-
-            // 🔹 Define um timeout para parar o escaneamento após 10 segundos
-            scanHandler.postDelayed(() -> {
-                mokoBleScanner.stopScanDevice();
+            // ============================================================
+            // 🔹 Define um timeout para parar o escaneamento após um tempo
+            _scanHandler.postDelayed(() -> {
+                _mokoBleScanner.stopScanDevice();
                 Log.d(TAG, "⏳ Escaneamento finalizado automaticamente após timeout.");
-            }, 1000);
+            }, _scanTimeout);
+            // ============================================================
 
         } catch (Exception e) {
-            if (scanPromise != null) {
-                scanPromise.reject("SCAN_ERROR", e);
-                scanPromise = null;
+            if (_scanPromise != null) {
+                _scanPromise.reject("SCAN_ERROR", e);
+                _scanPromise = null;
             }
-            isScanning = false;
+            _isScanning = false;
         }
     }
 
-    @ReactMethod
-    public void stopScanDevices(Promise promise) {
-        try {
-            if (!isScanning) {
-                promise.reject("NO_SCAN_RUNNING", "Nenhum escaneamento ativo.");
-                return;
+    private MokoScanDeviceCallback mokoScanDeviceCallback() {
+        return new MokoScanDeviceCallback() {
+            @Override
+            public void onStartScan() {
+                _isScanning = true;
+                Log.d(TAG, "🔍 Iniciando escaneamento de dispositivos...");
             }
 
-            mokoBleScanner.stopScanDevice();
-            scanHandler.removeCallbacksAndMessages(null);
-            isScanning = false;
-            Log.d(TAG, "🛑 Escaneamento interrompido com sucesso!");
-            promise.resolve("Escaneamento interrompido com sucesso!");
+            @Override
+            public void onScanDevice(DeviceInfo deviceInfo) {
+                ScanResult scanResult = deviceInfo.scanResult;
+                ScanRecord scanRecord = scanResult.getScanRecord();
+                Map<ParcelUuid, byte[]> serviceData = scanRecord.getServiceData();
 
-        } catch (Exception e) {
-            promise.reject("STOP_SCAN_ERROR", "Erro ao interromper escaneamento", e);
-        }
+                if (serviceData == null || serviceData.isEmpty()) {
+                    return;
+                }
+
+                byte[] data = serviceData.get(new ParcelUuid(OrderServices.SERVICE_ADV.getUuid()));
+                if (data == null || data.length != 1) {
+                    return;
+                }
+
+                deviceInfo.deviceType = data[0] & 0xFF;
+                _deviceMap.put(deviceInfo.mac, deviceInfo);
+                Log.d(TAG, "📡 Dispositivo encontrado: " + deviceInfo.name + " - " + deviceInfo.mac);
+            }
+
+            @Override
+            public void onStopScan() {
+                Log.d(TAG, "🛑 Escaneamento finalizado.");
+                _isScanning = false;
+                _devices.clear();
+                _devices.addAll(_deviceMap.values());
+
+                // 🔹 Converte os dispositivos encontrados para JSON e retorna para o React
+                // Native
+                JSONArray deviceArray = new JSONArray();
+                for (DeviceInfo device : _devices) {
+                    try {
+                        JSONObject jsonDevice = new JSONObject();
+                        jsonDevice.put("name", device.name);
+                        jsonDevice.put("mac", device.mac);
+                        jsonDevice.put("rssi", device.rssi);
+                        deviceArray.put(jsonDevice);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Erro ao converter dispositivo para JSON", e);
+                    }
+                }
+
+                if (_scanPromise != null) {
+                    _scanPromise.resolve(deviceArray.toString());
+                    _scanPromise = null;
+                }
+            }
+        };
     }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Conexão & Autenticação
+    ///////////////////////////////////////////////////////////////////////////
 
     @ReactMethod
     public void connectToDevice(String macAddress, Promise promise) {
         try {
             // Verifica se o dispositivo está no mapa de dispositivos
-            if (!deviceMap.containsKey(macAddress)) {
+            if (!_deviceMap.containsKey(macAddress)) {
                 promise.reject("DEVICE_NOT_FOUND", "Dispositivo não encontrado no mapa de dispositivos.");
                 return;
             }
 
             // Inicia a conexão do celular com o dispositivo (Gateway - Gerenciador de
             // Sensores)
-            MokoSupport moko = MokoSupport.getInstance();
-            moko.connDevice(macAddress);
+            MokoSupport.getInstance().connDevice(macAddress);
+            Log.d(TAG, "Conexão com dispositivo de mac " + macAddress + " iniciada.");
             promise.resolve("Conexão com dispositivo de mac " + macAddress + " iniciada.");
 
         } catch (Exception e) {
@@ -219,8 +223,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public boolean isDeviceConnected(String macAddress) {
         try {
-            MokoSupport moko = MokoSupport.getInstance();
-            return moko.isConnDevice(macAddress);
+            return MokoSupport.getInstance().isConnDevice(macAddress);
         } catch (Exception e) {
             Log.e(TAG, "❌ Erro ao verificar conexão com dispositivo", e);
             return false;
@@ -230,8 +233,7 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void disconnectDevice(Promise promise) {
         try {
-            MokoSupport moko = MokoSupport.getInstance();
-            moko.disConnectBle();
+            MokoSupport.getInstance().disConnectBle();
             promise.resolve("Dispositivo desconectado com sucesso!");
         } catch (Exception e) {
             promise.reject("DISCONNECTION_ERROR", e);
@@ -244,30 +246,38 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
         WritableMap params = Arguments.createMap();
 
         if (MokoConstants.ACTION_DISCONNECTED.equals(action)) {
-            Log.d(TAG, "🔗 EVENT_BUS: Dispositivo desconectado!");
-            params.putString("status", "disconnected");
+            Log.d(TAG, "🔗 EVENT_BUS: Dispositivo foi desconectado!");
+            params.putBoolean("isDeviceConnected", false);
+            params.putBoolean("isDeviceAuthenticated", false);
             sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
 
-            if (isPasswordError) {
-                isPasswordError = false;
-            } else {
-                Log.e(TAG, "❌ Conexão falhou, tentando novamente...");
+            if (_isPasswordError) {
+                _isPasswordError = false;
             }
+            // else {
+            // Log.e(TAG, "Dispositivo foi desconectado");
+            // }
         }
 
         if (MokoConstants.ACTION_DISCOVER_SUCCESS.equals(action)) {
             Log.d(TAG, "🔗 EVENT_BUS: Dispositivo descoberto com sucesso! Verificando senha...");
-            params.putString("status", "connected");
+            params.putBoolean("isDeviceConnected", true);
+            params.putBoolean("isDeviceAuthenticated", false);
             sendEvent(getReactApplicationContext(), "onConnectStatusEvent", params);
 
+            // Inicia ordem para autenticar o dispositivo com a senha padrão!
             new Handler().postDelayed(() -> {
                 List<OrderTask> orderTasks = new ArrayList<>();
-                orderTasks.add(OrderTaskAssembler.setPassword("Moko4321"));
+                orderTasks.add(OrderTaskAssembler.setPassword(_defaultPassword));
                 MokoSupport.getInstance().sendOrder(orderTasks.toArray(new OrderTask[0]));
                 Log.d(TAG, "🔐 Senha enviada automaticamente para autenticação.");
             }, 500);
         }
     }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Tarefas e Eventos
+    ///////////////////////////////////////////////////////////////////////////
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onOrderTaskResponseEvent(OrderTaskResponseEvent event) {
@@ -300,8 +310,9 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
                 int result = value[4] & 0xFF;
 
                 if (result == 1) {
-                    Log.d(TAG, "✅ Senha aceita pelo dispositivo!");
-                    params.putString("status", "authenticated");
+                    Log.d(TAG, "✅ Dispositivo autenticado!");
+                    params.putBoolean("isDeviceConnected", true);
+                    params.putBoolean("isDeviceAuthenticated", true);
                     sendEvent(getReactApplicationContext(), "onOrderTaskResponseEvent", params);
 
                     // Enviar usuário para a tela de informações do dispositivo
@@ -318,12 +329,6 @@ public class MokoScanModule extends ReactContextBaseJavaModule {
             }
         }
     }
-
-    // @ReactMethod
-    // public void setGatewayPassword() {
-    // String password = "senhaerrada";
-    // MokoSupport.getInstance().sendOrder(OrderTaskAssembler.setPassword(password));
-    // }
 
     // Não se esqueça de desregistrar o EventBus quando não for mais necessário
     public void onDestroy() {

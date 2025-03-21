@@ -1,0 +1,18 @@
+    // @ReactMethod
+    // public void stopScanDevices(Promise promise) {
+    // try {
+    // if (!_isScanning) {
+    // promise.reject("NO_SCAN_RUNNING", "Nenhum escaneamento ativo.");
+    // return;
+    // }
+
+    // _mokoBleScanner.stopScanDevice();
+    // _scanHandler.removeCallbacksAndMessages(null);
+    // _isScanning = false;
+    // Log.d(TAG, "🛑 Escaneamento interrompido com sucesso!");
+    // promise.resolve("Escaneamento interrompido com sucesso!");
+
+    // } catch (Exception e) {
+    // promise.reject("STOP_SCAN_ERROR", "Erro ao interromper escaneamento", e);
+    // }
+    // }
